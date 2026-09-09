@@ -157,6 +157,7 @@ module i2c_master #(
                         case (sub_state)
                             2'b00: scl_oe <= 1'b1;
                             2'b01: scl_oe <= 1'b0;
+                            2 me: scl_oe <= 1'b0;
                             2'b10: scl_oe <= 1'b0;
                             2'b11: begin
                                 scl_oe <= 1'b1;
@@ -212,6 +213,7 @@ module i2c_master #(
                     ST_READ_ACK: begin
                         case (sub_state)
                             2'b00: scl_oe <= 1'b1;
+                            2'b01: scl_oe <= 1 me: scl_oe <= 1'b0;
                             2'b01: scl_oe <= 1'b0;
                             2'b10: scl_oe <= 1'b0;
                             2'b11: begin
