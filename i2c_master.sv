@@ -158,7 +158,7 @@ module i2c_master #(
                             2'b00: scl_oe <= 1'b1;
                             2'b01: scl_oe <= 1'b0;
                             2'b10: scl_oe <= 1'b0;
-                            2 me, 2'b11: begin
+                            2'b11: begin
                                 scl_oe <= 1'b1;
                                 if (bit_cnt == 0) begin
                                     sda_oe <= 1'b0;
@@ -200,7 +200,7 @@ module i2c_master #(
                                 scl_oe <= 1'b1;
                                 if (bit_cnt == 0) begin
                                     rx_data <= {shift_reg[7:1], sda};
-                                    sda_oe  <= 1'b1; // Drive NACK/ACK
+                                    sda_oe  <= 1'b1;
                                     state   <= ST_READ_ACK;
                                 end else begin
                                     bit_cnt <= bit_cnt - 1'b1;
