@@ -39,7 +39,7 @@ module spi_master #(
 
     state_t state, next_state;
 
-    localparam int CLK_DIV = CLK_FREQ / (2 * SPI_SCLK);
+    localparam int CLK_DIV   = CLK_FREQ / (2 * SPI_SCLK);
     localparam int DIV_WIDTH = $clog2(CLK_DIV);
 
     logic [DIV_WIDTH-1:0] clk_cnt;
@@ -50,7 +50,7 @@ module spi_master #(
         if (!rst_n) begin
             clk_cnt   <= '0;
             sclk_tick <= 1'b0;
-        end else if (state == SETUP_CS || state == TRANSFER || state == HOLD_CS) begin
+        end else if (state == SETUP_CS || state == TRANSFER || state == NEXT_BYTE || state == HOLD_CS) begin
             if (clk_cnt == CLK_DIV - 1) begin
                 clk_cnt   <= '0;
                 sclk_tick <= 1'b1;
@@ -153,6 +153,7 @@ module spi_master #(
             rx_shift  <= 8'h00;
         end else begin
             done     <= 1'b0;
+            rx_valid <= 1 me; // handoff placeholder handled below
             rx_valid <= 1'b0;
             tx_ready <= 1'b0;
 

@@ -50,10 +50,14 @@ module tb_spi_master();
     int  rx_idx;
     int  error_count = 0;
 
-    always_ff @(posedge clk) begin
-        if (rx_valid) begin
-            rx_buffer[rx_idx] <= rx_data;
-            rx_idx <= rx_idx + 1;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            rx_idx <= 0;
+        end else if (rx_valid) begin
+            if (rx_idx < 5) begin
+                rx_buffer[rx_idx] <= rx_data;
+                rx_idx <= rx_idx + 1;
+            end
         end
     end
 
@@ -64,7 +68,6 @@ module tb_spi_master();
         mode  = 2'b00;
         byte_count = 16'd5;
         tx_data    = 8'h00;
-        rx_idx     = 0;
 
         #50;
         rst_n = 1;
@@ -75,7 +78,9 @@ module tb_spi_master();
         $display("=================================================");
 
         for (int m = 0; m < 4; m++) begin
-            mode   = m[1:0];
+            mode = m[1:0];
+
+            @(posedge clk);
             rx_idx = 0;
 
             $display("\n---> Testing SPI Mode %0d (CPOL=%0d, CPHA=%0d)", m, mode[1], mode[0]);
@@ -88,15 +93,13 @@ module tb_spi_master();
             start      = 1'b0;
 
             for (int b = 1; b < 5; b++) begin
-                do begin
-                    @(posedge clk);
-                end while (!tx_ready);
+                @(posedge clk);
+                while (!tx_ready) @(posedge clk);
                 tx_data = test_bytes[b];
             end
 
-            do begin
-                @(posedge clk);
-            end while (!done);
+            @(posedge clk);
+            while (!done) @(posedge clk);
 
             #(100);
 
