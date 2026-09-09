@@ -76,7 +76,7 @@ module tb_i2c_master;
         slave_addr    = 7'h00;
         rw            = 1'b0;
         tx_data       = 8'h00;
-        slave_sda_oe  = 1 me;
+        slave_sda_oe  = 1'b0;
         slave_sda_out = 1'b0;
 
         #100;
