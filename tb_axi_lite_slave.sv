@@ -1,5 +1,54 @@
 `timescale 1ns/1ps
 
+module uart_tx #(
+    parameter int CLK_FREQ = 100_000_000,
+    parameter int BAUD_RATE = 10_000_000
+)(
+    input  logic       clk,
+    input  logic       rst_n,
+    input  logic       tx_start,
+    input  logic [7:0] tx_data,
+    output logic       tx_busy,
+    output logic       tx_pin
+);
+    localparam int CLK_PER_BIT = CLK_FREQ / BAUD_RATE;
+    logic [$clog2(CLK_PER_BIT)-1:0] clk_cnt;
+    logic [3:0] bit_cnt;
+    logic [9:0] shift_reg;
+
+    assign tx_pin = tx_busy ? shift_reg[0] : 1'b1;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            tx_busy   <= 1'b0;
+            clk_cnt   <= '0;
+            bit_cnt   <= '0;
+            shift_reg <= 10'h3FF;
+        end else begin
+            if (!tx_busy) begin
+                if (tx_start) begin
+                    tx_busy   <= 1'b1;
+                    shift_reg <= {1'b1, tx_data, 1'b0};
+                    clk_cnt   <= '0;
+                    bit_cnt   <= '0;
+                end
+            end else begin
+                if (clk_cnt >= CLK_PER_BIT - 1) begin
+                    clk_cnt <= '0;
+                    if (bit_cnt == 4'd9) begin
+                        tx_busy <= 1'b0;
+                    end else begin
+                        bit_cnt   <= bit_cnt + 1'b1;
+                        shift_reg <= {1'b1, shift_reg[9:1]};
+                    end
+                end else begin
+                    clk_cnt <= clk_cnt + 1'b1;
+                end
+            end
+        end
+    end
+endmodule
+
 module tb_axi_lite_slave;
 
     localparam int C_S_AXI_DATA_WIDTH = 32;
