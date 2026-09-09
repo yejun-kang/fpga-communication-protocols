@@ -37,7 +37,7 @@ module spi_master #(
         DONE_ST   = 3'b101
     } state_t;
 
-    state_t state, next_state;
+    state_t state;
 
     localparam int CLK_DIV   = CLK_FREQ / (2 * SPI_SCLK);
     localparam int DIV_WIDTH = $clog2(CLK_DIV);
@@ -45,6 +45,17 @@ module spi_master #(
     logic [DIV_WIDTH-1:0] clk_cnt;
     logic                 sclk_tick;
     logic                 sclk_reg;
+    logic [4:0]           edge_cnt;
+
+    logic [15:0] bytes_rem;
+    logic [7:0]  tx_shift;
+    logic [7:0]  rx_shift;
+    logic        cs_n_reg;
+    logic        mosi_reg;
+
+    assign sclk = sclk_reg;
+    assign cs_n = cs_n_reg;
+    assign mosi = mosi_reg;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -66,85 +77,8 @@ module spi_master #(
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            sclk_reg <= 1'b0;
-        end else begin
-            if (state == IDLE || state == SETUP_CS || state == HOLD_CS || state == DONE_ST) begin
-                sclk_reg <= cpol;
-            end else if (state == TRANSFER && sclk_tick) begin
-                sclk_reg <= ~sclk_reg;
-            end
-        end
-    end
-
-    assign sclk = sclk_reg;
-
-    logic leading_edge, trailing_edge;
-    assign leading_edge  = sclk_tick && (sclk_reg == cpol);
-    assign trailing_edge = sclk_tick && (sclk_reg != cpol);
-
-    logic sample_edge, drive_edge;
-    assign sample_edge = (cpha == 1'b0) ? leading_edge  : trailing_edge;
-    assign drive_edge  = (cpha == 1'b0) ? trailing_edge : leading_edge;
-
-    logic [2:0]  bit_cnt;
-    logic [15:0] bytes_rem;
-    logic [7:0]  tx_shift;
-    logic [7:0]  rx_shift;
-    logic        cs_n_reg;
-    logic        mosi_reg;
-
-    assign cs_n = cs_n_reg;
-    assign mosi = mosi_reg;
-
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            state <= IDLE;
-        end else begin
-            state <= next_state;
-        end
-    end
-
-    always_comb begin
-        next_state = state;
-        case (state)
-            IDLE: begin
-                if (start && (byte_count > 0))
-                    next_state = SETUP_CS;
-            end
-
-            SETUP_CS: begin
-                if (sclk_tick)
-                    next_state = TRANSFER;
-            end
-
-            TRANSFER: begin
-                if (sample_edge && (bit_cnt == 3'd0)) begin
-                    if (bytes_rem == 16'd1)
-                        next_state = HOLD_CS;
-                    else
-                        next_state = NEXT_BYTE;
-                end
-            end
-
-            NEXT_BYTE: begin
-                next_state = TRANSFER;
-            end
-
-            HOLD_CS: begin
-                if (sclk_tick)
-                    next_state = DONE_ST;
-            end
-
-            DONE_ST: begin
-                next_state = IDLE;
-            end
-
-            default: next_state = IDLE;
-        endcase
-    end
-
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+            state     <= IDLE;
+            sclk_reg  <= 1'b0;
             cs_n_reg  <= 1'b1;
             mosi_reg  <= 1'b0;
             busy      <= 1'b0;
@@ -152,8 +86,8 @@ module spi_master #(
             tx_ready  <= 1'b0;
             rx_valid  <= 1'b0;
             rx_data   <= 8'h00;
-            bit_cnt   <= 3'd7;
-            bytes_rem <= 16'd0;
+            edge_cnt  <= '0;
+            bytes_rem <= '0;
             tx_shift  <= 8'h00;
             rx_shift  <= 8'h00;
         end else begin
@@ -163,58 +97,102 @@ module spi_master #(
 
             case (state)
                 IDLE: begin
-                    cs_n_reg  <= 1'b1;
-                    busy      <= 1'b0;
-                    mosi_reg  <= 1'b0;
+                    cs_n_reg <= 1'b1;
+                    busy     <= 1'b0;
+                    mosi_reg <= 1'b0;
+                    sclk_reg <= cpol;
                     if (start && (byte_count > 0)) begin
                         busy      <= 1'b1;
                         bytes_rem <= byte_count;
                         tx_shift  <= tx_data;
-                        bit_cnt   <= 3'd7;
-                        tx_ready  <= 1'b1;
+                        state     <= SETUP_CS;
                     end
                 end
 
                 SETUP_CS: begin
                     cs_n_reg <= 1'b0;
-                    mosi_reg <= tx_shift[7];
+                    sclk_reg <= cpol;
+                    edge_cnt <= '0;
+                    if (cpha == 1'b0) begin
+                        mosi_reg <= tx_shift[7];
+                    end
+                    if (sclk_tick) begin
+                        tx_ready <= 1'b1;
+                        state    <= TRANSFER;
+                    end
                 end
 
                 TRANSFER: begin
-                    if (drive_edge) begin
-                        if (bit_cnt > 3'd0) begin
-                            mosi_reg <= tx_shift[bit_cnt - 1'b1];
-                        end
-                    end
+                    if (sclk_tick) begin
+                        sclk_reg <= ~sclk_reg;
+                        edge_cnt <= edge_cnt + 1'b1;
 
-                    if (sample_edge) begin
-                        rx_shift <= {rx_shift[6:0], miso};
-                        if (bit_cnt == 3'd0) begin
-                            bit_cnt  <= 3'd7;
-                            rx_data  <= {rx_shift[6:0], miso};
-                            rx_valid <= 1'b1;
+                        if (cpha == 1'b0) begin
+                            if (edge_cnt[0] == 1'b1 && edge_cnt < 5'd15) begin
+                                mosi_reg <= tx_shift[7 - ((edge_cnt + 1) >> 1)];
+                            end
+                            if (edge_cnt[0] == 1'b0) begin
+                                rx_shift <= {rx_shift[6:0], miso};
+                                if (edge_cnt == 5'd14) begin
+                                    rx_data  <= {rx_shift[6:0], miso};
+                                    rx_valid <= 1'b1;
+                                end
+                            end
                         end else begin
-                            bit_cnt <= bit_cnt - 1'b1;
+                            if (edge_cnt == 5'd0) begin
+                                mosi_reg <= tx_shift[7];
+                            end else if (edge_cnt[0] == 1'b0 && edge_cnt < 5'd14) begin
+                                mosi_reg <= tx_shift[7 - (edge_cnt >> 1)];
+                            end
+                            if (edge_cnt[0] == 1'b1) begin
+                                rx_shift <= {rx_shift[6:0], miso};
+                                if (edge_cnt == 5'd15) begin
+                                    rx_data  <= {rx_shift[6:0], miso};
+                                    rx_valid <= 1'b1;
+                                end
+                            end
+                        end
+
+                        if (edge_cnt == 5'd15) begin
+                            if (bytes_rem == 16'd1) begin
+                                state <= HOLD_CS;
+                            end else begin
+                                bytes_rem <= bytes_rem - 1'b1;
+                                tx_shift  <= tx_data;
+                                tx_ready  <= 1'b1;
+                                state     <= NEXT_BYTE;
+                            end
                         end
                     end
                 end
 
                 NEXT_BYTE: begin
-                    bytes_rem <= bytes_rem - 1'b1;
-                    tx_shift  <= tx_data;
-                    tx_ready  <= 1'b1;
-                    mosi_reg  <= tx_data[7];
+                    sclk_reg <= cpol;
+                    edge_cnt <= '0;
+                    if (cpha == 1'b0) begin
+                        mosi_reg <= tx_shift[7];
+                    end
+                    if (sclk_tick) begin
+                        state <= TRANSFER;
+                    end
                 end
 
                 HOLD_CS: begin
+                    sclk_reg <= cpol;
                     mosi_reg <= 1'b0;
+                    if (sclk_tick) begin
+                        state <= DONE_ST;
+                    end
                 end
 
                 DONE_ST: begin
                     cs_n_reg <= 1'b1;
                     busy     <= 1'b0;
                     done     <= 1'b1;
+                    state    <= IDLE;
                 end
+
+                default: state <= IDLE;
             endcase
         end
     end
