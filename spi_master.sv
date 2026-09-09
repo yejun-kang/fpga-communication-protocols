@@ -8,7 +8,7 @@ module spi_master #(
     input  logic        rst_n,
 
     input  logic        start,
-    input  logic [1:0]  mode,
+    input  logic [1:0]  mode,        // mode[1] = CPOL, mode[0] = CPHA
     input  logic [15:0] byte_count,
     output logic        busy,
     output logic        done,
@@ -154,7 +154,7 @@ module spi_master #(
             rx_shift  <= 8'h00;
         end else begin
             done     <= 1'b0;
-            rx_valid <= 1'b0;
+            rx_valid <= 1 me0; // Cleared by default each cycle
             tx_ready <= 1'b0;
 
             case (state)
@@ -173,24 +173,22 @@ module spi_master #(
 
                 SETUP_CS: begin
                     cs_n_reg <= 1'b0;
-                    mosi_reg <= tx_shift[7]; // Set MSB bit ready for both CPHA=0 and CPHA=1
+                    // CPHA = 0 requires MOSI valid before first SCLK edge
+                    if (cpha == 1'b0) begin
+                        mosi_reg <= tx_shift[7];
+                    end
                 end
 
                 TRANSFER: begin
                     if (drive_edge) begin
-                        if (cpha == 1'b1) begin
-                            if (bit_cnt > 3'd0)
-                                mosi_reg <= tx_shift[bit_cnt - 1'b1];
-                        end else begin
-                            mosi_reg <= tx_shift[bit_cnt];
-                        end
+                        mosi_reg <= tx_shift[bit_cnt];
                     end
 
                     if (sample_edge) begin
-                        rx_shift[bit_cnt] <= miso;
+                        rx_shift <= {rx_shift[6:0], miso};
                         if (bit_cnt == 3'd0) begin
                             bit_cnt  <= 3'd7;
-                            rx_data  <= {rx_shift[7:1], miso};
+                            rx_data  <= {rx_shift[6:0], miso}; // Directly use incoming miso bit
                             rx_valid <= 1'b1;
                         end else begin
                             bit_cnt <= bit_cnt - 1'b1;
@@ -202,7 +200,9 @@ module spi_master #(
                     bytes_rem <= bytes_rem - 1'b1;
                     tx_shift  <= tx_data;
                     tx_ready  <= 1'b1;
-                    mosi_reg  <= tx_data[7];
+                    if (cpha == 1'b0) begin
+                        mosi_reg <= tx_data[7];
+                    end
                 end
 
                 HOLD_CS: begin
