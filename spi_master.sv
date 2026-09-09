@@ -8,7 +8,7 @@ module spi_master #(
     input  logic        rst_n,
 
     input  logic        start,
-    input  logic [1:0]  mode,        // mode[1] = CPOL, mode[0] = CPHA
+    input  logic [1:0]  mode,
     input  logic [15:0] byte_count,
     output logic        busy,
     output logic        done,
@@ -154,8 +154,7 @@ module spi_master #(
             rx_shift  <= 8'h00;
         end else begin
             done     <= 1'b0;
-            rx_valid <= 1 me0; // Cleared by default each cycle
-            tx_ready <= 1'b0;
+            rx_valid <= 1'b0;
 
             case (state)
                 IDLE: begin
@@ -173,7 +172,6 @@ module spi_master #(
 
                 SETUP_CS: begin
                     cs_n_reg <= 1'b0;
-                    // CPHA = 0 requires MOSI valid before first SCLK edge
                     if (cpha == 1'b0) begin
                         mosi_reg <= tx_shift[7];
                     end
@@ -188,7 +186,7 @@ module spi_master #(
                         rx_shift <= {rx_shift[6:0], miso};
                         if (bit_cnt == 3'd0) begin
                             bit_cnt  <= 3'd7;
-                            rx_data  <= {rx_shift[6:0], miso}; // Directly use incoming miso bit
+                            rx_data  <= {rx_shift[6:0], miso};
                             rx_valid <= 1'b1;
                         end else begin
                             bit_cnt <= bit_cnt - 1'b1;
@@ -219,3 +217,4 @@ module spi_master #(
     end
 
 endmodule
+
