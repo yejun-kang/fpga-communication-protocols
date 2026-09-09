@@ -78,9 +78,13 @@ module spi_master #(
 
     assign sclk = sclk_reg;
 
+    logic leading_edge, trailing_edge;
+    assign leading_edge  = sclk_tick && (sclk_reg == cpol);
+    assign trailing_edge = sclk_tick && (sclk_reg != cpol);
+
     logic sample_edge, drive_edge;
-    assign sample_edge = sclk_tick && ((cpha == 1'b0) ? (sclk_reg == cpol) : (sclk_reg != cpol));
-    assign drive_edge  = sclk_tick && ((cpha == 1'b0) ? (sclk_reg != cpol) : (sclk_reg == cpol));
+    assign sample_edge = (cpha == 1'b0) ? leading_edge  : trailing_edge;
+    assign drive_edge  = (cpha == 1'b0) ? trailing_edge : leading_edge;
 
     logic [2:0]  bit_cnt;
     logic [15:0] bytes_rem;
@@ -114,7 +118,7 @@ module spi_master #(
             end
 
             TRANSFER: begin
-                if (sclk_tick && (bit_cnt == 3'd0) && sample_edge) begin
+                if (sample_edge && (bit_cnt == 3'd0)) begin
                     if (bytes_rem == 16'd1)
                         next_state = HOLD_CS;
                     else
@@ -155,6 +159,7 @@ module spi_master #(
         end else begin
             done     <= 1'b0;
             rx_valid <= 1'b0;
+            tx_ready <= 1'b0;
 
             case (state)
                 IDLE: begin
@@ -172,21 +177,21 @@ module spi_master #(
 
                 SETUP_CS: begin
                     cs_n_reg <= 1'b0;
-                    if (cpha == 1'b0) begin
-                        mosi_reg <= tx_shift[7];
-                    end
+                    mosi_reg <= tx_shift[7];
                 end
 
                 TRANSFER: begin
                     if (drive_edge) begin
-                        mosi_reg <= tx_shift[bit_cnt];
+                        if (bit_cnt > 3'd0) begin
+                            mosi_reg <= tx_shift[bit_cnt - 1'b1];
+                        end
                     end
 
                     if (sample_edge) begin
-                        rx_shift <= {rx_shift[6:0], miso};
+                        rx_shift[bit_cnt] <= miso;
                         if (bit_cnt == 3'd0) begin
                             bit_cnt  <= 3'd7;
-                            rx_data  <= {rx_shift[6:0], miso};
+                            rx_data  <= {rx_shift[7:1], miso};
                             rx_valid <= 1'b1;
                         end else begin
                             bit_cnt <= bit_cnt - 1'b1;
@@ -198,9 +203,7 @@ module spi_master #(
                     bytes_rem <= bytes_rem - 1'b1;
                     tx_shift  <= tx_data;
                     tx_ready  <= 1'b1;
-                    if (cpha == 1'b0) begin
-                        mosi_reg <= tx_data[7];
-                    end
+                    mosi_reg  <= tx_data[7];
                 end
 
                 HOLD_CS: begin
@@ -217,4 +220,3 @@ module spi_master #(
     end
 
 endmodule
-
