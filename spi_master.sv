@@ -188,10 +188,10 @@ module spi_master #(
                     end
 
                     if (sample_edge) begin
-                        rx_shift[bit_cnt] <= miso;
+                        rx_shift <= {rx_shift[6:0], miso};
                         if (bit_cnt == 3'd0) begin
                             bit_cnt  <= 3'd7;
-                            rx_data  <= {rx_shift[7:1], miso};
+                            rx_data  <= {rx_shift[6:0], miso};
                             rx_valid <= 1'b1;
                         end else begin
                             bit_cnt <= bit_cnt - 1'b1;
