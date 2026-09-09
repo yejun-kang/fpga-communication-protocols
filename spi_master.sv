@@ -32,8 +32,9 @@ module spi_master #(
         IDLE      = 3'b000,
         SETUP_CS  = 3'b001,
         TRANSFER  = 3'b010,
-        HOLD_CS   = 3'b011,
-        DONE_ST   = 3'b100
+        NEXT_BYTE = 3'b011,
+        HOLD_CS   = 3'b100,
+        DONE_ST   = 3'b101
     } state_t;
 
     state_t state;
@@ -61,7 +62,7 @@ module spi_master #(
         if (!rst_n) begin
             clk_cnt   <= '0;
             sclk_tick <= 1'b0;
-        end else if (state == SETUP_CS || state == TRANSFER || state == HOLD_CS) begin
+        end else if (state == SETUP_CS || state == TRANSFER || state == NEXT_BYTE || state == HOLD_CS) begin
             if (clk_cnt == CLK_DIV - 1) begin
                 clk_cnt   <= '0;
                 sclk_tick <= 1'b1;
@@ -106,7 +107,6 @@ module spi_master #(
                         busy      <= 1'b1;
                         bytes_rem <= byte_count;
                         tx_shift  <= tx_data;
-                        tx_ready  <= 1'b1; // Signal testbench to prepare next byte
                         state     <= SETUP_CS;
                     end
                 end
@@ -160,22 +160,29 @@ module spi_master #(
                             end
                         end
 
-                        // End of byte frame handling
                         if (edge_cnt == 5'd15) begin
-                            edge_cnt <= '0;
                             if (bytes_rem == 16'd1) begin
                                 state <= HOLD_CS;
                             end else begin
                                 bytes_rem <= bytes_rem - 1'b1;
-                                tx_shift  <= tx_data; // Load pre-buffered byte
-                                tx_ready  <= 1'b1;
-                                if (cpha == 1'b0) begin
-                                    mosi_reg <= tx_data[7]; // Pre-drive MSB for CPHA=0
-                                end
+                                tx_ready  <= 1'b1; // Ask TB for next byte NOW
+                                state     <= NEXT_BYTE;
                             end
                         end else begin
                             edge_cnt <= edge_cnt + 1'b1;
                         end
+                    end
+                end
+
+                NEXT_BYTE: begin
+                    sclk_reg <= cpol;
+                    edge_cnt <= '0;
+                    tx_shift <= tx_data; // Capture updated tx_data
+                    if (cpha == 1'b0) begin
+                        mosi_reg <= tx_data[7];
+                    end
+                    if (sclk_tick) begin
+                        state <= TRANSFER;
                     end
                 end
 
