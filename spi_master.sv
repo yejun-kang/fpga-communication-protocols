@@ -148,7 +148,7 @@ module spi_master #(
             tx_ready  <= 1'b0;
             rx_valid  <= 1'b0;
             rx_data   <= 8'h00;
-            bit_cnt   <= 3'd0;
+            bit_cnt   <= 3'd7;
             bytes_rem <= 16'd0;
             tx_shift  <= 8'h00;
             rx_shift  <= 8'h00;
@@ -173,19 +173,16 @@ module spi_master #(
 
                 SETUP_CS: begin
                     cs_n_reg <= 1'b0;
-                    if (cpha == 1'b0) begin
-                        mosi_reg <= tx_shift[7];
-                    end
+                    mosi_reg <= tx_shift[7]; // Set MSB bit ready for both CPHA=0 and CPHA=1
                 end
 
                 TRANSFER: begin
                     if (drive_edge) begin
                         if (cpha == 1'b1) begin
-                            mosi_reg <= tx_shift[bit_cnt];
+                            if (bit_cnt > 3'd0)
+                                mosi_reg <= tx_shift[bit_cnt - 1'b1];
                         end else begin
-                            if (bit_cnt != 3'd7) begin
-                                mosi_reg <= tx_shift[bit_cnt];
-                            end
+                            mosi_reg <= tx_shift[bit_cnt];
                         end
                     end
 
@@ -205,9 +202,7 @@ module spi_master #(
                     bytes_rem <= bytes_rem - 1'b1;
                     tx_shift  <= tx_data;
                     tx_ready  <= 1'b1;
-                    if (cpha == 1'b0) begin
-                        mosi_reg <= tx_data[7];
-                    end
+                    mosi_reg  <= tx_data[7];
                 end
 
                 HOLD_CS: begin
