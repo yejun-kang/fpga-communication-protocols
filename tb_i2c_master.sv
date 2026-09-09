@@ -83,15 +83,20 @@ module tb_i2c_master;
         rst_n = 1'b1;
         #100;
 
-        @(posedge ready);
+        // --- Write Cycle ---
+        @(posedge clk);
+        wait(ready);
         slave_addr <= 7'h3C;
         rw         <= 1'b0;
         tx_data    <= 8'hA5;
         start      <= 1'b1;
-        @(posedge clk);
-        start      <= 1'b0;
 
         fork
+            begin
+                wait(!ready);
+                @(posedge clk);
+                start <= 1'b0;
+            end
             begin
                 repeat (8) @(negedge scl);
                 slave_ack();
@@ -105,14 +110,19 @@ module tb_i2c_master;
 
         #500;
 
-        @(posedge ready);
+        // --- Read Cycle ---
+        @(posedge clk);
+        wait(ready);
         slave_addr <= 7'h3C;
         rw         <= 1'b1;
         start      <= 1'b1;
-        @(posedge clk);
-        start      <= 1'b0;
 
         fork
+            begin
+                wait(!ready);
+                @(posedge clk);
+                start <= 1'b0;
+            end
             begin
                 repeat (8) @(negedge scl);
                 slave_ack();
@@ -125,6 +135,7 @@ module tb_i2c_master;
         assert(rx_data == 8'h7E) else $error("Read Test Failed: Mismatched data received");
 
         #500;
+        $display("SUCCESS: All I2C Tests Passed!");
         $finish;
     end
 
