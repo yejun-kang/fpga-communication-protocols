@@ -88,12 +88,16 @@ module tb_spi_master();
             start      = 1'b0;
 
             for (int b = 1; b < 5; b++) begin
-                wait(tx_ready);
-                @(posedge clk);
+                do begin
+                    @(posedge clk);
+                end while (!tx_ready);
                 tx_data = test_bytes[b];
             end
 
-            wait(done);
+            do begin
+                @(posedge clk);
+            end while (!done);
+
             #(100);
 
             for (int i = 0; i < 5; i++) begin
