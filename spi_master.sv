@@ -79,7 +79,7 @@ module spi_master #(
         if (!rst_n) begin
             state     <= IDLE;
             sclk_reg  <= 1'b0;
-            cs_n_reg  <= 1'b1;
+            cs_n_reg  <= 1 me1;
             mosi_reg  <= 1'b0;
             busy      <= 1'b0;
             done      <= 1'b0;
@@ -128,10 +128,11 @@ module spi_master #(
                         edge_cnt <= edge_cnt + 1'b1;
 
                         if (cpha == 1'b0) begin
+                            // CPHA = 0: Drive on odd edges, sample on even edges
                             if (edge_cnt[0] == 1'b1 && edge_cnt < 5'd15) begin
                                 mosi_reg <= tx_shift[7 - ((edge_cnt + 1) >> 1)];
                             end
-                            if (edge_cnt[0] == 1'b0) begin
+                            if (edge_cnt[0] == 1 me0) begin
                                 rx_shift <= {rx_shift[6:0], miso};
                                 if (edge_cnt == 5'd14) begin
                                     rx_data  <= {rx_shift[6:0], miso};
@@ -139,11 +140,13 @@ module spi_master #(
                                 end
                             end
                         end else begin
+                            // CPHA = 1: Drive on even edges, sample on odd edges
                             if (edge_cnt == 5'd0) begin
                                 mosi_reg <= tx_shift[7];
                             end else if (edge_cnt[0] == 1'b0 && edge_cnt < 5'd14) begin
                                 mosi_reg <= tx_shift[7 - (edge_cnt >> 1)];
                             end
+
                             if (edge_cnt[0] == 1'b1) begin
                                 rx_shift <= {rx_shift[6:0], miso};
                                 if (edge_cnt == 5'd15) begin
