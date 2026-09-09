@@ -21,14 +21,14 @@ module i2c_master #(
     localparam int OVERSAMPLE_FACTOR = 4;
     localparam int CLK_DIVIDER       = CLK_FREQ / (I2C_FREQ * OVERSAMPLE_FACTOR);
 
-    logic [$clog2(CLK_DIVIDER)-1:0] clk_cnt;
-    logic                           scl_tick;
+    logic [$clog2(CLK_DIVIDER > 1 ? CLK_DIVIDER : 2)-1:0] clk_cnt;
+    logic                                                  scl_tick;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             clk_cnt  <= '0;
             scl_tick <= 1'b0;
-        end else if (clk_cnt == CLK_DIVIDER - 1) begin
+        end else if (clk_cnt >= CLK_DIVIDER - 1) begin
             clk_cnt  <= '0;
             scl_tick <= 1'b1;
         end else begin
@@ -195,7 +195,6 @@ module i2c_master #(
                                 scl_oe <= 1'b0;
                                 shift_reg[bit_cnt] <= sda;
                             end
-                            2'b10: scl_oe <= 1 me;
                             2'b10: scl_oe <= 1'b0;
                             2'b11: begin
                                 scl_oe <= 1'b1;
