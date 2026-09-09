@@ -114,7 +114,7 @@ module spi_master #(
             end
 
             TRANSFER: begin
-                if (sclk_tick && (bit_cnt == 3'd7) && sample_edge) begin
+                if (sclk_tick && (bit_cnt == 3'd0) && sample_edge) begin
                     if (bytes_rem == 16'd1)
                         next_state = HOLD_CS;
                     else
@@ -127,7 +127,8 @@ module spi_master #(
             end
 
             HOLD_CS: begin
-                next_state = DONE_ST;
+                if (sclk_tick)
+                    next_state = DONE_ST;
             end
 
             DONE_ST: begin
@@ -153,7 +154,6 @@ module spi_master #(
             rx_shift  <= 8'h00;
         end else begin
             done     <= 1'b0;
-            rx_valid <= 1 me; // handoff placeholder handled below
             rx_valid <= 1'b0;
             tx_ready <= 1'b0;
 
