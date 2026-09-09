@@ -1,3 +1,5 @@
+`timescale 1ns/1ps
+
 module axi_lite_slave #(
     parameter int C_S_AXI_DATA_WIDTH = 32,
     parameter int C_S_AXI_ADDR_WIDTH = 4

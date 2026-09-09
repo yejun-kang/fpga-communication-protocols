@@ -37,7 +37,6 @@ module tb_axi_lite_slave;
     logic [7:0]                    rx_data;
     logic                          tx_pin;
 
-    // Instantiate AXI4-Lite Slave Register Interface
     axi_lite_slave #(
         .C_S_AXI_DATA_WIDTH(C_S_AXI_DATA_WIDTH),
         .C_S_AXI_ADDR_WIDTH(C_S_AXI_ADDR_WIDTH)
@@ -68,10 +67,9 @@ module tb_axi_lite_slave;
         .rx_data(rx_data)
     );
 
-    // Instantiate Real UART Transmitter
     uart_tx #(
         .CLK_FREQ(100_000_000),
-        .BAUD_RATE(10_000_000) // Fast baud rate for simulation speed
+        .BAUD_RATE(10_000_000)
     ) u_uart_tx (
         .clk(s_axi_aclk),
         .rst_n(s_axi_aresetn),
@@ -151,24 +149,20 @@ module tb_axi_lite_slave;
         s_axi_aresetn = 1'b1;
         #20;
 
-        // 1. Write transmit byte payload to DATA register (0x8)
         axi_write(4'h8, 32'h0000_00A5);
-
-        // 2. Trigger UART transmission via CTRL register write (0x0)
         axi_write(4'h0, 32'h0000_0001);
 
-        // 3. Poll STATUS register (0x4) until UART tx_busy goes HIGH then back LOW
         do begin
             axi_read(4'h4, read_val);
-        end while (read_val[0] == 1'b0); // Wait for transmission to start
+        end while (read_val[0] == 1'b0);
 
-        assert(read_val[0] == 1'b1) else $error("STATUS check failed: BUSY bit not set");
+        $display("[%0t ns] SUCCESS: UART transmission started, BUSY set", $time);
 
         do begin
             axi_read(4'h4, read_val);
-        end while (read_val[0] == 1'b1); // Wait for transmission to finish
+        end while (read_val[0] == 1'b1);
 
-        assert(read_val[0] == 1'b0) else $error("STATUS check failed: BUSY bit failed to clear");
+        $display("[%0t ns] SUCCESS: UART transmission complete, BUSY cleared", $time);
 
         #100;
         $finish;
