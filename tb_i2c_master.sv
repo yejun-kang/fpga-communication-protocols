@@ -2,11 +2,9 @@
 
 module tb_i2c_master;
 
-    // --- Clock and Reset Parameters ---
-    localparam int CLK_FREQ = 100_000_000; // 100 MHz System Clock
-    localparam int I2C_FREQ = 1_000_000;   // 1 MHz I2C Fast-Mode Plus
+    localparam int CLK_FREQ = 100_000_000;
+    localparam int I2C_FREQ = 1_000_000;
 
-    // --- Testbench Signals ---
     logic       clk;
     logic       rst_n;
     logic       start;
@@ -21,19 +19,15 @@ module tb_i2c_master;
     wire        scl;
     wire        sda;
 
-    // Slave model control signals
     logic       sda_slave_oe;
     logic       scl_slave_oe;
 
-    // Open-Drain Tri-State drivers for slave model
     assign sda = sda_slave_oe ? 1'b0 : 1'bz;
     assign scl = scl_slave_oe ? 1'b0 : 1'bz;
 
-    // Pull-up resistors for open-drain I2C bus
     pullup(scl);
     pullup(sda);
 
-    // --- Instantiate DUT ---
     i2c_master #(
         .CLK_FREQ(CLK_FREQ),
         .I2C_FREQ(I2C_FREQ)
@@ -52,31 +46,25 @@ module tb_i2c_master;
         .sda(sda)
     );
 
-    // --- Clock Generation (100 MHz) ---
     always #5 clk = ~clk;
 
-    // --- Slave Tasks ---
-    // Responds with ACK (pulls SDA low for 1 SCL cycle)
     task automatic slave_ack();
         @(negedge scl);
-        sda_slave_oe <= 1'b1; // Drive SDA LOW (ACK)
+        sda_slave_oe <= 1'b1;
         @(negedge scl);
-        sda_slave_oe <= 1'b0; // Release SDA
+        sda_slave_oe <= 1'b0;
     endtask
 
-    // Sends 1 byte back to the master during Read transactions
     task automatic slave_send_byte(input logic [7:0] data);
         for (int i = 7; i >= 0; i--) begin
             @(negedge scl);
-            sda_slave_oe <= (data[i] == 1'b0); // Drive low for '0', release for '1'
+            sda_slave_oe <= (data[i] == 1'b0);
         end
         @(negedge scl);
-        sda_slave_oe <= 1'b0; // Release line for Master ACK/NACK phase
+        sda_slave_oe <= 1'b0;
     endtask
 
-    // --- Test Stimulus Sequence ---
     initial begin
-        // Initialize Signals
         clk          = 1'b0;
         rst_n        = 1'b0;
         start        = 1'b0;
@@ -86,20 +74,16 @@ module tb_i2c_master;
         sda_slave_oe = 1'b0;
         scl_slave_oe = 1'b0;
 
-        // Apply Reset
         #100;
         rst_n = 1'b1;
         #100;
 
-        // ==========================================
-        // TEST CASE 1: I2C Write Transaction
-        // ==========================================
-        $display("[%0t ns] --- Starting Test 1: Write Cycle ---", $time);
-        
+        $display("[%0t ns] Starting Write Cycle...", $time);
+
         @(posedge clk);
         wait(ready);
         slave_addr <= 7'h3C;
-        rw         <= 1'b0;       // Write operation
+        rw         <= 1'b0;
         tx_data    <= 8'hA5;
         start      <= 1'b1;
 
@@ -107,66 +91,67 @@ module tb_i2c_master;
             begin
                 wait(!ready);
                 @(posedge clk);
-                start <= 1'b0;   // Hold start until FSM exits IDLE
+                start <= 1'b0;
             end
             begin
-                // Receive Address + RW byte and issue ACK
                 repeat (8) @(negedge scl);
                 slave_ack();
-
-                // Receive Data byte and issue ACK
                 repeat (8) @(negedge scl);
                 slave_ack();
             end
-        join
+            begin
+                #50000;
+                $error("[%0t ns] TIMEOUT: Simulation hung waiting for Write Cycle!", $time);
+                $finish;
+            end
+        join_any
+        disable fork;
 
         @(posedge done);
         if (ack_error == 1'b0) begin
-            $display("[%0t ns] SUCCESS: Write Cycle Completed without ACK error.", $time);
+            $display("[%0t ns] SUCCESS: Write Cycle Passed", $time);
         end else begin
-            $error("[%0t ns] FAILURE: Write Cycle returned ACK Error!", $time);
+            $error("[%0t ns] FAILURE: Write Cycle ACK error", $time);
         end
 
         #1000;
 
-        // ==========================================
-        // TEST CASE 2: I2C Read Transaction
-        // ==========================================
-        $display("[%0t ns] --- Starting Test 2: Read Cycle ---", $time);
+        $display("[%0t ns] Starting Read Cycle...", $time);
 
         @(posedge clk);
         wait(ready);
         slave_addr <= 7'h3C;
-        rw         <= 1'b1;       // Read operation
+        rw         <= 1'b1;
         start      <= 1'b1;
 
         fork
             begin
                 wait(!ready);
                 @(posedge clk);
-                start <= 1'b0;   // Hold start until FSM exits IDLE
+                start <= 1'b0;
             end
             begin
-                // Receive Address + RW byte and issue ACK
                 repeat (8) @(negedge scl);
                 slave_ack();
-
-                // Send Byte (8'h7E) to Master
                 slave_send_byte(8'h7E);
             end
-        join
+            begin
+                #50000;
+                $error("[%0t ns] TIMEOUT: Simulation hung waiting for Read Cycle!", $time);
+                $finish;
+            end
+        join_any
+        disable fork;
 
         @(posedge done);
         if (ack_error == 1'b0 && rx_data == 8'h7E) begin
-            $display("[%0t ns] SUCCESS: Read Cycle Completed! Received Data: 0x%0h", $time, rx_data);
+            $display("[%0t ns] SUCCESS: Read Cycle Passed! rx_data = 0x%0h", $time, rx_data);
         end else begin
-            $error("[%0t ns] FAILURE: Read Cycle Error! ACK Error = %b, rx_data = 0x%0h (Expected 0x7E)", 
-                   $time, ack_error, rx_data);
+            $error("[%0t ns] FAILURE: Read Cycle Error! rx_data = 0x%0h", $time, rx_data);
         end
 
         #1000;
 
-        // Final Summary
         $display("\n==========================================");
         $display("   SUCCESS: All I2C Tests Passed!          ");
         $display("==========================================\n");
