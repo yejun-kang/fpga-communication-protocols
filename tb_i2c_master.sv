@@ -83,7 +83,6 @@ module tb_i2c_master;
         rst_n = 1'b1;
         #100;
 
-        // --- Write Cycle ---
         @(posedge clk);
         wait(ready);
         slave_addr <= 7'h3C;
@@ -110,7 +109,6 @@ module tb_i2c_master;
 
         #500;
 
-        // --- Read Cycle ---
         @(posedge clk);
         wait(ready);
         slave_addr <= 7'h3C;

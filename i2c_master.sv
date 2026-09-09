@@ -2,7 +2,7 @@
 
 module i2c_master #(
     parameter int CLK_FREQ = 100_000_000,
-    parameter int I2C_FREQ = 100_000
+    parameter int I2C_FREQ = 1_000_000
 )(
     input  logic       clk,
     input  logic       rst_n,
@@ -101,7 +101,7 @@ module i2c_master #(
                             2'b01: begin sda_oe <= 1'b1; scl_oe <= 1'b0; end
                             2'b10: begin sda_oe <= 1'b1; scl_oe <= 1'b1; end
                             2'b11: begin
-                                sda_oe    <= !shift_reg[bit_cnt];
+                                sda_oe    <= (shift_reg[bit_cnt] == 1'b0);
                                 state     <= ST_ADDR;
                                 sub_state <= '0;
                             end
@@ -120,7 +120,7 @@ module i2c_master #(
                                     state  <= ST_ADDR_ACK;
                                 end else begin
                                     bit_cnt <= bit_cnt - 1'b1;
-                                    sda_oe  <= !shift_reg[bit_cnt - 1'b1];
+                                    sda_oe  <= (shift_reg[bit_cnt - 1'b1] == 1'b0);
                                 end
                             end
                         endcase
@@ -143,7 +143,7 @@ module i2c_master #(
                                     state <= ST_STOP;
                                 end else if (rw == 1'b0) begin
                                     shift_reg <= tx_data;
-                                    sda_oe    <= !tx_data[7];
+                                    sda_oe    <= (tx_data[7] == 1'b0);
                                     state     <= ST_WRITE;
                                 end else begin
                                     sda_oe <= 1'b0;
@@ -165,7 +165,7 @@ module i2c_master #(
                                     state  <= ST_WRITE_ACK;
                                 end else begin
                                     bit_cnt <= bit_cnt - 1'b1;
-                                    sda_oe  <= !shift_reg[bit_cnt - 1'b1];
+                                    sda_oe  <= (shift_reg[bit_cnt - 1'b1] == 1'b0);
                                 end
                             end
                         endcase
@@ -195,6 +195,7 @@ module i2c_master #(
                                 scl_oe <= 1'b0;
                                 shift_reg[bit_cnt] <= sda;
                             end
+                            2'b10: scl_oe <= 1 me;
                             2'b10: scl_oe <= 1'b0;
                             2'b11: begin
                                 scl_oe <= 1'b1;
