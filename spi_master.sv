@@ -32,9 +32,8 @@ module spi_master #(
         IDLE      = 3'b000,
         SETUP_CS  = 3'b001,
         TRANSFER  = 3'b010,
-        NEXT_BYTE = 3'b011,
-        HOLD_CS   = 3'b100,
-        DONE_ST   = 3'b101
+        HOLD_CS   = 3'b011,
+        DONE_ST   = 3'b100
     } state_t;
 
     state_t state;
@@ -57,11 +56,12 @@ module spi_master #(
     assign cs_n = cs_n_reg;
     assign mosi = mosi_reg;
 
+    // SCLK Tick Generator
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             clk_cnt   <= '0;
             sclk_tick <= 1'b0;
-        end else if (state == SETUP_CS || state == TRANSFER || state == NEXT_BYTE || state == HOLD_CS) begin
+        end else if (state == SETUP_CS || state == TRANSFER || state == HOLD_CS) begin
             if (clk_cnt == CLK_DIV - 1) begin
                 clk_cnt   <= '0;
                 sclk_tick <= 1'b1;
@@ -75,11 +75,12 @@ module spi_master #(
         end
     end
 
+    // Master FSM & SPI Shift Logic
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state     <= IDLE;
             sclk_reg  <= 1'b0;
-            cs_n_reg  <= 1 me1;
+            cs_n_reg  <= 1'b1;
             mosi_reg  <= 1'b0;
             busy      <= 1'b0;
             done      <= 1'b0;
@@ -105,6 +106,7 @@ module spi_master #(
                         busy      <= 1'b1;
                         bytes_rem <= byte_count;
                         tx_shift  <= tx_data;
+                        tx_ready  <= 1'b1; // Signal testbench to prepare next byte
                         state     <= SETUP_CS;
                     end
                 end
@@ -117,37 +119,39 @@ module spi_master #(
                         mosi_reg <= tx_shift[7];
                     end
                     if (sclk_tick) begin
-                        tx_ready <= 1'b1;
-                        state    <= TRANSFER;
+                        state <= TRANSFER;
                     end
                 end
 
                 TRANSFER: begin
                     if (sclk_tick) begin
                         sclk_reg <= ~sclk_reg;
-                        edge_cnt <= edge_cnt + 1'b1;
 
+                        // --- CPHA = 0 ---
                         if (cpha == 1'b0) begin
-                            // CPHA = 0: Drive on odd edges, sample on even edges
-                            if (edge_cnt[0] == 1'b1 && edge_cnt < 5'd15) begin
-                                mosi_reg <= tx_shift[7 - ((edge_cnt + 1) >> 1)];
-                            end
-                            if (edge_cnt[0] == 1 me0) begin
+                            // Sample on EVEN edges (0, 2, 4, 6, 8, 10, 12, 14)
+                            if (edge_cnt[0] == 1'b0) begin
                                 rx_shift <= {rx_shift[6:0], miso};
                                 if (edge_cnt == 5'd14) begin
                                     rx_data  <= {rx_shift[6:0], miso};
                                     rx_valid <= 1'b1;
                                 end
                             end
-                        end else begin
-                            // CPHA = 1: Drive on even edges, sample on odd edges
-                            if (edge_cnt == 5'd0) begin
-                                mosi_reg <= tx_shift[7];
-                            end else if (edge_cnt[0] == 1'b0 && edge_cnt < 5'd14) begin
+                            // Drive on ODD edges (1, 3, 5, 7, 9, 11, 13)
+                            else begin
+                                if (edge_cnt < 5'd15) begin
+                                    mosi_reg <= tx_shift[6 - (edge_cnt >> 1)];
+                                end
+                            end
+                        end
+                        // --- CPHA = 1 ---
+                        else begin
+                            // Drive on EVEN edges (0, 2, 4, 6, 8, 10, 12, 14)
+                            if (edge_cnt[0] == 1'b0) begin
                                 mosi_reg <= tx_shift[7 - (edge_cnt >> 1)];
                             end
-
-                            if (edge_cnt[0] == 1'b1) begin
+                            // Sample on ODD edges (1, 3, 5, 7, 9, 11, 13, 15)
+                            else begin
                                 rx_shift <= {rx_shift[6:0], miso};
                                 if (edge_cnt == 5'd15) begin
                                     rx_data  <= {rx_shift[6:0], miso};
@@ -156,27 +160,22 @@ module spi_master #(
                             end
                         end
 
+                        // End of byte frame handling
                         if (edge_cnt == 5'd15) begin
+                            edge_cnt <= '0;
                             if (bytes_rem == 16'd1) begin
                                 state <= HOLD_CS;
                             end else begin
                                 bytes_rem <= bytes_rem - 1'b1;
-                                tx_shift  <= tx_data;
+                                tx_shift  <= tx_data; // Load pre-buffered byte
                                 tx_ready  <= 1'b1;
-                                state     <= NEXT_BYTE;
+                                if (cpha == 1'b0) begin
+                                    mosi_reg <= tx_data[7]; // Pre-drive MSB for CPHA=0
+                                end
                             end
+                        end else begin
+                            edge_cnt <= edge_cnt + 1'b1;
                         end
-                    end
-                end
-
-                NEXT_BYTE: begin
-                    sclk_reg <= cpol;
-                    edge_cnt <= '0;
-                    if (cpha == 1'b0) begin
-                        mosi_reg <= tx_shift[7];
-                    end
-                    if (sclk_tick) begin
-                        state <= TRANSFER;
                     end
                 end
 
