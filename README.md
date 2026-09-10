@@ -1,17 +1,33 @@
-# Week 3: Serial Communication Protocols & AXI4-Lite Interface
+# fpga-communication-protocols
 
-This repository contains SystemVerilog implementations and testbenches for standard digital communication interfaces and bus protocols.
+A structured collection of SystemVerilog digital logic implementations, serial communication controllers, and bus interfaces, complete with self-checking testbenches, simulation waveforms, and hardware verification on the Digilent Basys 3 FPGA board.
 
-## Modules Included
+## Table of Contents
 
-* **UART Controller**: Fully synchronous UART TX/RX core targeted for Basys 3 FPGA deployment.
-* **SPI Master**: Configurable Serial Peripheral Interface controller with parameterized clock frequency and word length.
-* **I2C Master**: Inter-Integrated Circuit master controller supporting standard start/stop conditions and byte transfers with ACK/NACK handling.
-* **AXI4-Lite Slave**: Memory-mapped register interface implementing standard AXI4-Lite read/write channel handshakes.
+| Module / Protocol | Description | Directory | Verification / Demo |
+| :--- | :--- | :---: | :---: |
+| **ALU Hardware Demo** | 8-operation Arithmetic Logic Unit implemented on Basys 3 FPGA | [alu](./alu/) | [Basys 3 Demo Photo](./alu/docs/alu_basys.png) |
+| **UART** | Full-duplex asynchronous serial controller with XDC constraints | [uart](./uart/) | [Waveform](./uart/docs/uart.png) \| [Terminal Demo](./uart/docs/uart_powershell.png) | [Basys 3 Demo Photo](./uart/docs/uart_basys.png) |
+| **SPI Master** | Parameterized Mode 0 (CPOL=0, CPHA=0) controller | [spi](./spi/) | [Waveform](./spi/docs/spi_master.png) |
+| **I2C Master** | Single-master bus controller with ACK/NACK handling | [i2c](./i2c/) | [Waveform](./i2c/docs/i2c_master.png) |
+| **AXI4-Lite** | 32-bit memory-mapped slave register interface | [axi_lite](./axi_lite/) | [Waveform](./axi_lite/docs/axi_lite_slave.png) |
 
-## Repository Organization
+---
 
-* `uart/`: UART transmitter/receiver modules, constraints, and testbenches.
-* `spi/`: SPI Master implementation and verification.
-* `i2c/`: I2C Master module and functional testbench.
-* `axi_lite/`: AXI4-Lite register slave module and simulation testbench.
+## Detailed Directory Links
+
+* [**alu**](./alu/)
+  * [ALU Documentation (`README.md`)](./alu/README.md)
+  * [Basys 3 Board Demo Image](./alu/docs/alu_basys.png)
+* [**uart**](./uart/)
+  * [Transmitter (`uart_tx.sv`)](./uart/uart_tx.sv)
+  * [Receiver (`uart_rx.sv`)](./uart/uart_rx.sv)
+  * [Top Level (`uart_top.sv`)](./uart/uart_top.sv)
+  * [Basys 3 Constraints (`basys3_uart.xdc`)](./uart/basys3_uart.xdc)
+  * [Basys 3 Board Demo Image](./uart/docs/uart_basys.png)
+* [**spi**](./spi/)
+  * [SPI Master Core (`spi_master.sv`)](./spi/spi_master.sv)
+* [**i2c**](./i2c/)
+  * [I2C Master Core (`i2c_master.sv`)](./i2c/i2c_master.sv)
+* [**axi_lite**](./axi_lite/)
+  * [AXI4-Lite Slave (`axi_lite_slave.sv`)](./axi_lite/axi_lite_slave.sv)
