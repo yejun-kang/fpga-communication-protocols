@@ -1,21 +1,17 @@
-## Hardware Implementation & PPA Metrics
+# Week 3: Serial Communication Protocols & AXI4-Lite Interface
 
-The 8-function 4-bit ALU target was synthesized, routed, and verified on the Xilinx Artix-7 FPGA (`xc7a35tcpg236-1`) using Vivado.
+This repository contains SystemVerilog implementations and testbenches for standard digital communication interfaces and bus protocols.
 
-### Area & Resource Utilization
-| Resource | Used | Available | Utilization % |
-| :--- | :--- | :--- | :--- |
-| **Slice LUTs** | 16 | 20,800 | 0.08% |
-| **Slice Registers (FFs)** | 0 | 41,600 | 0.00% |
-| **Bonded IOB (Ports)** | 28 | 106 | 26.42% |
+## Modules Included
 
-### Performance & Timing Metrics
-| Metric | Value |
-| :--- | :--- |
-| **Critical Path Delay ($T_{\text{max}}$)** | 16.822 ns |
-| **Min Propagation Delay ($T_{\text{min}}$)** | 2.475 ns |
-| **Maximum Equivalent Frequency ($F_{\max}$)** | 59.45 MHz |
-| **Unconstrained Paths** | 10 Setup / 10 Hold |
+* **UART Controller**: Fully synchronous UART TX/RX core targeted for Basys 3 FPGA deployment.
+* **SPI Master**: Configurable Serial Peripheral Interface controller with parameterized clock frequency and word length.
+* **I2C Master**: Inter-Integrated Circuit master controller supporting standard start/stop conditions and byte transfers with ACK/NACK handling.
+* **AXI4-Lite Slave**: Memory-mapped register interface implementing standard AXI4-Lite read/write channel handshakes.
 
-### Key Architectural Takeaway
-Because this design is 100% combinational, zero Flip-Flops (FFs) are utilized. The 16.822 ns critical path represents the combined propagation delay of the ALU logic operation cascaded into the 7-segment display decoder.
+## Repository Organization
+
+* `uart/`: UART transmitter/receiver modules, constraints, and testbenches.
+* `spi/`: SPI Master implementation and verification.
+* `i2c/`: I2C Master module and functional testbench.
+* `axi_lite/`: AXI4-Lite register slave module and simulation testbench.
