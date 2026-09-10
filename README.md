@@ -1,4 +1,4 @@
-# fpga-communication-protocols
+# Week 3: Serial Communication Protocols & AXI4-Lite Interface
 
 A structured collection of SystemVerilog digital logic implementations, serial communication controllers, and bus interfaces, complete with self-checking testbenches, simulation waveforms, and hardware verification on the Digilent Basys 3 FPGA board.
 
